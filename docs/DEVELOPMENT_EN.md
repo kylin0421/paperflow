@@ -1,6 +1,6 @@
 # Paper Flow Development Guide
 
-[中文](DEVELOPMENT.md) | [Back to English README](../README_EN.md)
+[English](DEVELOPMENT_EN.md) | [中文](DEVELOPMENT.md) | [Back to README](../README.md)
 
 ## Requirements
 

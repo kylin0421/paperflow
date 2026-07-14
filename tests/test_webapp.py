@@ -533,8 +533,9 @@ def test_new_ui_features_and_readme_have_english_support():
     root = Path(__file__).parents[1]
     html = (root / "src/paperflow/static/index.html").read_text(encoding="utf-8")
     chat = (root / "src/paperflow/static/chat.html").read_text(encoding="utf-8")
-    english = (root / "README_EN.md").read_text(encoding="utf-8")
-    chinese = (root / "README.md").read_text(encoding="utf-8")
+    english = (root / "README.md").read_text(encoding="utf-8")
+    chinese = (root / "README_ZH.md").read_text(encoding="utf-8")
+    technical_english = (root / "docs/TECHNICAL_EN.md").read_text(encoding="utf-8")
 
     assert "History & search" in html
     assert "Your high-weight interests" in html
@@ -547,10 +548,10 @@ def test_new_ui_features_and_readme_have_english_support():
     assert "Chat history" in chat
     assert "/api/chats" in chat
     assert "TL;DR generation failed:" in (root / "src/paperflow/webapp.py").read_text(encoding="utf-8")
-    assert "[English](README_EN.md)" in chinese
-    assert "[简体中文](README.md)" in english
+    assert "[English](README.md)" in chinese
+    assert "[简体中文](README_ZH.md)" in english
     assert "## Build Windows Packages" in english
-    assert "## Recommendation Architecture" in english
+    assert "## Recommendation Pipeline" in technical_english
     assert "## Project Origin" in english
 
 

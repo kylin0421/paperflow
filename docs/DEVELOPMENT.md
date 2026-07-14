@@ -1,6 +1,6 @@
 # Paper Flow 开发指南
 
-[返回中文 README](../README.md) | [English](DEVELOPMENT_EN.md)
+[返回中文 README](../README_ZH.md) | [English](DEVELOPMENT_EN.md)
 
 ## 环境要求
 

@@ -1,8 +1,8 @@
 # Paper Flow Technical Guide
 
-[中文](TECHNICAL.md) | [Back to English README](../README_EN.md)
+[English](TECHNICAL_EN.md) | [中文](TECHNICAL.md) | [Back to README](../README.md)
 
-This document describes Paper Flow's recommendation architecture, LLM responsibilities, interest profiles, paper chat, caching, and privacy boundaries. See the [README](../README_EN.md) for installation and the [development guide](DEVELOPMENT_EN.md) for packaging and release work.
+This document describes Paper Flow's recommendation architecture, LLM responsibilities, interest profiles, paper chat, caching, and privacy boundaries. See the [README](../README.md) for installation and the [development guide](DEVELOPMENT_EN.md) for packaging and release work.
 
 ## Recommendation Pipeline
 

@@ -1,8 +1,8 @@
 # Paper Flow 技术说明
 
-[返回中文 README](../README.md) | [English](TECHNICAL_EN.md)
+[返回中文 README](../README_ZH.md) | [English](TECHNICAL_EN.md)
 
-本文说明 Paper Flow 的推荐架构、LLM 职责、兴趣画像、论文对话、缓存与隐私边界。安装和快速使用见[项目 README](../README.md)，构建和发布见[开发指南](DEVELOPMENT.md)。
+本文说明 Paper Flow 的推荐架构、LLM 职责、兴趣画像、论文对话、缓存与隐私边界。安装和快速使用见[中文 README](../README_ZH.md)，构建和发布见[开发指南](DEVELOPMENT.md)。
 
 ## 推荐流程
 
