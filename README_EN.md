@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README_EN.md)
 
-![Paper Flow icon](branding/paperflow.svg)
+<img src="branding/paperflow.svg" alt="Paper Flow" width="96">
 
 Paper Flow is a local-first Windows application for discovering arXiv papers. It learns an initial research profile from a local PDF library, then continuously adapts to **Interested / Okay / Not interested** feedback.
 

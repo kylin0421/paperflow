@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README_EN.md)
 
-![Paper Flow icon](branding/paperflow.svg)
+<img src="branding/paperflow.svg" alt="Paper Flow" width="96">
 
 Paper Flow 是一个本地优先的 Windows arXiv 论文推荐应用。它从你的本地 PDF 论文库建立初始兴趣，并根据“感兴趣 / 还行 / 不感兴趣”反馈持续调整推荐。
 
