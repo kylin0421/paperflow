@@ -2,102 +2,72 @@
 
 [简体中文](README_ZH.md) | [English](README.md)
 
-<img src="branding/paperflow.svg" alt="Paper Flow" width="96">
+<img src="branding/paperflow.svg" alt="Paper Flow" width="64">
 
-Paper Flow 是一个本地优先的 Windows arXiv 论文推荐应用。它从你的本地 PDF 论文库和显式反馈中学习兴趣，用轻量本地召回与 LLM 语义筛选推荐论文。
+Paper Flow 是一个隐私优先、本地运行的 arXiv 论文推荐器。它从本地 PDF 论文库、显式评分和用户自由编辑的兴趣中学习，结合本地混合召回、LLM 语义筛选与带证据的全文论文对话。
 
-当前版本：**v0.0.0 pre-release**
+当前版本：**v0.1.0**
 
-## 核心能力
+## 轻量 localhost 部署
 
-- 按 arXiv 发布时间发现论文，候选不足时自动翻页并扩大检索范围。
-- “感兴趣 / 还行 / 不感兴趣”只记录偏好，与打开 PDF、论文聊天完全解耦。
-- 使用 LLM 生成细粒度兴趣方向并合并近义标签，不再把 `cs.CV` 等大类当作兴趣画像。
-- 支持自由增删高权重的偏好与回避方向，以及对历史推荐进行自然语言检索。
-- 独立的 Chat with Paper 窗口支持拖动、缩放、最小化、历史记录和自由追问。
-- 语义筛选、推荐总结、兴趣画像、论文聊天可分别配置模型。
-- 显示 arXiv 请求、筛选、总结、保存等真实进度，支持中英文和深色模式。
-- PDF 解析、推荐文案、兴趣画像和聊天历史均在本机缓存。
+这是依赖最少、跨平台的运行方式，不需要 Windows 桌面壳、WebView2 或 MinerU。
 
-推荐系统、模型边界、主题合并、缓存与隐私策略详见[技术说明](docs/TECHNICAL.md)。
+需要 Python 3.13 和 [uv](https://docs.astral.sh/uv/)：
 
-## Windows 安装
-
-### 安装程序
-
-1. 从 Releases 下载 `PaperFlow-Setup.exe`。
-2. 运行安装器并启动 Paper Flow。
-3. 选择本地 PDF 文件夹，填写兼容 OpenAI Chat Completions 的 API Key、Base URL 和模型名称。
-
-安装器按当前用户安装，不需要管理员权限，并会在需要时准备 Microsoft Edge WebView2 Runtime。卸载不会删除 `%LOCALAPPDATA%\Paper Flow` 中的个人数据库。
-
-> 当前预发布版本尚未进行商业代码签名，Windows SmartScreen 可能显示“未知发布者”。
-
-### 便携版
-
-解压完整的 `PaperFlow-portable.zip` 后运行 `PaperFlow.exe`。不要单独复制 EXE；相邻的 `_internal` 文件夹包含运行组件。
-
-系统要求：64 位 Windows 10/11、可访问 arXiv 与所配置 LLM API 的网络，以及一个本地 PDF 论文文件夹。
-
-## 首次配置
-
-基础设置包括本地论文库和 LLM API Key。高级设置可以配置下载目录、arXiv 分类、推荐批次数量、回溯天数、API Base URL、界面语言以及四类功能模型。
-
-旧版本的单模型配置会自动继承到四个模型槽位；模型名称必须由当前 Base URL 实际支持。推荐阶段只使用 arXiv metadata，只有用户在论文聊天中发送问题后才会按需处理全文。
-
-## 从源码运行
-
-需要 Python 3.13 和 [uv](https://docs.astral.sh/uv/)。
-
-```powershell
+```bash
 git clone https://github.com/kylin0421/paperflow.git
 cd paperflow
-uv sync --group dev
-uv run paperflow-desktop
-```
-
-浏览器调试模式：
-
-```powershell
+uv sync
 uv run paperflow --host 127.0.0.1 --port 8765
 ```
 
-## 构建 Windows 发布包
+打开 `http://127.0.0.1:8765`，选择包含 PDF 的本地论文文件夹，并填写兼容 OpenAI API 的 Key、Base URL 与模型名称。
+
+## Windows 应用
+
+从 [Releases](https://github.com/kylin0421/paperflow/releases) 下载 `PaperFlow-Setup.exe` 或 `PaperFlow-portable.zip`。便携版必须完整解压，不能只复制 `PaperFlow.exe`。
+
+从源码启动桌面版：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1
+uv sync --extra desktop
+uv run paperflow-desktop
 ```
 
-主要输出：
+v0.1.0 尚未进行商业代码签名，Windows SmartScreen 可能提示未知发布者。安装器按当前用户安装，不需要管理员权限，卸载不会自动删除个人数据库。
 
-```text
-dist\PaperFlow\PaperFlow.exe
-dist\PaperFlow-portable.zip
-dist\installer\PaperFlow-Setup.exe
-```
+## v0.1.0 核心能力
 
-测试：`uv run pytest`
+- 用 LLM 生成细粒度兴趣方向并合并近义标签，不再把 arXiv 大类当作兴趣；偏好与回避方向可无限、自由增删。
+- 词级/字符级混合召回、可选 embedding、反馈时间衰减、自动校准语义筛选、多兴趣配额、MMR 多样性，以及精准/均衡/探索三种模式。
+- 持久化 arXiv 候选缓存，区分检索批次与最终推荐批次，未凑满时继续翻页，并对 429 持久退避。
+- 记录每轮召回分数、LLM 拒绝理由、决策路径，并用真实反馈统计推荐命中率与空批次率。
+- 自然语言历史检索、中英文界面、深色模式、细粒度进度和长任务取消。
+- 独立论文对话窗口、持久历史、Markdown 渲染、分功能模型，以及带章节证据的长文问答。
+- 可通过外部 `mineru-api` 使用 MinerU 3.x 结构化解析，失败时自动回退本地 PyMuPDF。
+- 带版本的 SQLite 迁移、API Key 加密、连接测试和内置备份恢复。
 
-完整的开发、打包和发布检查见[开发指南](docs/DEVELOPMENT.md)。
+“感兴趣 / 还行 / 不感兴趣”只改变偏好；打开原 PDF 和论文对话是独立行为，不会自动评分。
 
-## 数据与隐私
+## 可选 MinerU
 
-- 数据库位于 `%LOCALAPPDATA%\Paper Flow\state.db`，API Key、反馈、历史和设置均保存在本机。
-- 初始兴趣画像会向用户配置的 LLM 发送最多 12 篇本地 PDF 的截断开头；结果会缓存并在后台按变化更新。
-- 论文全文只在用户主动发送聊天问题时处理；打开 PDF 或切换聊天历史不会调用 LLM，也不会改变兴趣反馈。
+将 [MinerU](https://github.com/opendatalab/MinerU) 作为独立服务运行，然后在高级设置中填写地址（例如 `http://127.0.0.1:8000`）。Paper Flow 使用其结构化 Markdown 做长论文的完整章节选择与证据编号；默认轻量版不安装 MinerU，服务不可用时使用 PyMuPDF。
 
-更完整的数据边界见[技术说明：数据、缓存与隐私](docs/TECHNICAL.md#数据缓存与隐私)。
+部署选择与设计细节见 [MinerU 与长 PDF 对话](docs/MINERU.md)。
+
+## 隐私
+
+SQLite 数据库保存在本地（Windows 应用为 `%LOCALAPPDATA%\Paper Flow\state.db`，localhost 默认为 `~/.paperflow/state.db`）。API Key 在 Windows 上使用 DPAPI，在其他系统使用本安装实例的加密密钥保护。推荐阶段只处理 arXiv metadata；仅当用户主动发送论文对话问题后才处理全文。设置中提供备份、恢复和缓存管理。
 
 ## 文档
 
-- [技术说明：推荐架构、LLM、兴趣画像与隐私](docs/TECHNICAL.md)
-- [开发指南：运行、构建、发布检查与路线图](docs/DEVELOPMENT.md)
+- [技术架构](docs/TECHNICAL.md)
+- [MinerU 与长 PDF 对话](docs/MINERU.md)
+- [开发、打包与发布](docs/DEVELOPMENT.md)
 - [更新记录](CHANGELOG.md)
 
-## 项目来源
+## 项目来源与许可证
 
-Paper Flow 基于 [TideDra/zotero-arxiv-daily](https://github.com/TideDra/zotero-arxiv-daily) 开发。当前版本已移除 Zotero、邮件推送、bioRxiv/medRxiv 和旧定时工作流，重构为本地桌面交互应用。
+Paper Flow 基于 [TideDra/zotero-arxiv-daily](https://github.com/TideDra/zotero-arxiv-daily) 开发，已将 Zotero、邮件推送和定时工作流重构为本地交互应用。
 
-## License
-
-AGPL-3.0-or-later，详见 [LICENSE](LICENSE)。
+许可证为 AGPL-3.0-or-later，详见 [LICENSE](LICENSE)。

@@ -4,24 +4,24 @@
 
 ## Requirements
 
-- 64-bit Windows 10 or Windows 11
 - Python 3.13
 - [uv](https://docs.astral.sh/uv/)
-- Inno Setup for installer creation; the build script can obtain the WebView2 Bootstrapper
+- For the Windows package only: 64-bit Windows 10/11 and Inno Setup
 
 ## Run from Source
 
 ```powershell
 git clone https://github.com/kylin0421/paperflow.git
 cd paperflow
-uv sync --group dev
-uv run paperflow-desktop
+uv sync
+uv run paperflow --host 127.0.0.1 --port 8765
 ```
 
-Browser development mode:
+Windows desktop mode:
 
 ```powershell
-uv run paperflow --host 127.0.0.1 --port 8765
+uv sync --extra desktop --group dev
+uv run paperflow-desktop
 ```
 
 Default desktop data directory:
@@ -38,7 +38,7 @@ uv run ruff check src tests
 python -m compileall src tests
 ```
 
-The current suite covers settings migration, model routing, recommendation/profile caching, chat persistence, APIs, static pages, and native-window behavior.
+The suite covers secret/schema migration, backup/restore, recommendation calibration and caching, arXiv backoff, structured PDF context, model routing, chat persistence, static pages, and native-window behavior.
 
 ## Windows Build
 
@@ -67,8 +67,8 @@ Distribute the entire portable package. `PaperFlow.exe` depends on the adjacent 
 
 ## GitHub Actions
 
-- `.github/workflows/ci.yml` runs tests and quality checks.
-- `.github/workflows/windows-release.yml` builds Windows artifacts.
+- `.github/workflows/ci.yml` runs Ruff, compilation, tests, and coverage on every main push and pull request.
+- `.github/workflows/windows-release.yml` builds Windows artifacts on `v*` tags and publishes them to a GitHub Release.
 
 Before a release, keep workflow versions aligned with Python, uv, PyInstaller, and the lockfile, then validate both installer and portable packages in a clean environment.
 
@@ -81,7 +81,9 @@ Before a release, keep workflow versions aligned with Python, uv, PyInstaller, a
 - [x] Chinese/English UI and README plus dark mode.
 - [x] Legacy Zotero, email, bioRxiv/medRxiv, and training dependencies removed.
 - [x] PyMuPDF layout/ONNX resources included in the directory build.
-- [x] Automated tests and packaging script.
+- [x] Schema v3 migration, encrypted secrets, and backup/restore.
+- [x] Optional external MinerU integration with lightweight fallback.
+- [x] Automated tests and versioned GitHub release packaging.
 - [ ] Authenticode code signing.
 - [ ] Manual acceptance tests on clean Windows 10 and Windows 11 virtual machines.
 

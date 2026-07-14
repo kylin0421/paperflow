@@ -1,148 +1,143 @@
-# Paper Flow Technical Guide
+# Paper Flow Technical Architecture
 
-[English](TECHNICAL_EN.md) | [中文](TECHNICAL.md) | [Back to README](../README.md)
+[English](TECHNICAL_EN.md) | [中文](TECHNICAL.md) | [README](../README.md)
 
-This document describes Paper Flow's recommendation architecture, LLM responsibilities, interest profiles, paper chat, caching, and privacy boundaries. See the [README](../README.md) for installation and the [development guide](DEVELOPMENT_EN.md) for packaging and release work.
+## System boundary
 
-## Recommendation Pipeline
-
-Paper Flow uses a layered **candidate generation → local scoring → LLM semantic screening → diversity reranking** pipeline adapted to a local, single-user, cold-start workflow.
+Paper Flow is a single-user, local-first system. SQLite is the source of truth; arXiv is the paper source; all LLM calls use the endpoint and task-specific models configured by the user.
 
 ```text
-Local PDFs + explicit feedback + manual labels
-                       ↓
-        Interest prototypes and semantic profile
-                       ↓
-Paginated arXiv → local retrieval → LLM screening → freshness/MMR → final batch
+Local PDFs + ratings + manual labels
+                 │
+                 ▼
+       fine-grained interest profile
+                 │
+arXiv cache ──► hybrid retrieval ──► LLM screening ──► quota/MMR ──► feed
+                                                                    │
+PDF behavior ──► PyMuPDF or MinerU ──► structured sections ──► evidence chat
 ```
 
-### 1. Paginated arXiv candidates
+Ratings and behaviors are deliberately separate. Ratings train recommendation; opening a PDF and sending chat questions do not implicitly change preference.
 
-- Broad arXiv categories constrain the search space but are not treated as user interests.
-- The user setting controls the final batch; each network page retrieves 200 candidates.
-- Local retrieval/reranking blocks contain `max(final batch × 3, 60)` papers.
-- When too few candidates pass, Paper Flow continues through the block and requests offsets `200/400/...` as necessary.
-- Retrieval stops only when the final batch is full or the lookback window is genuinely exhausted.
-- HTTP 429 responses use backoff and retry instead of tight repeated requests.
+## Recommendation v2
 
-### 2. Weighted multi-interest retrieval
+### Candidate service
 
-Titles and abstracts use TF-IDF n-gram representations. Multiple positive and negative prototypes preserve smaller interests that would be diluted by one averaged centroid.
+The background candidate service caches newest-first arXiv metadata by category query. Recommendation requests consume the cache first and continue network pagination only when the final batch is still short.
 
-| Source | Role | Weight |
-| --- | --- | ---: |
-| Manual preferred label | Strong positive prototype | `2.5` |
-| Interested paper | Strong positive feedback | `1.8` |
-| LLM-learned preferred direction | Positive prototype | `1.8` |
-| Okay paper | Weak positive feedback | `0.45` |
-| Not-interested paper | Negative prototype | Strong negative |
-| Manual avoided label | Strong negative prototype | Strong negative |
+Three settings have different meanings:
 
-Manual labels have the highest positive weight and accept arbitrary text without natural-language command parsing.
+- `batch_size`: final papers shown to the user;
+- `retrieval_batch_size`: candidates ranked together in one local/LLM screening group;
+- `max_candidates`: maximum scanned before declaring that the current lookback has no more qualified papers.
 
-### 3. LLM semantic screening
+The arXiv page size is independently configurable. HTTP failures update persistent `failure_count` and `next_retry_at` state with exponential backoff, so restarting or clicking repeatedly cannot cause a tight 429 loop. Background-job status is also persisted.
 
-The LLM receives only a small locally retrieved metadata pool together with the cached semantic profile, recent positive and negative examples, and manual labels. It returns an interest probability and explicit rejection decision.
+### Interest evidence
 
-A candidate must reach `0.58` and avoid rejected directions. Precision takes priority, so a final batch may remain smaller when the lookback window contains too few qualified papers. Timeouts, malformed structured output, or API failures fall back to local ranking.
+Recommendation uses several independent prototypes instead of one averaged user vector:
 
-### 4. Freshness and diversity
+| Evidence | Base weight | Behavior |
+| --- | ---: | --- |
+| Manual preferred/avoided direction | 2.5 | Highest priority, no decay |
+| LLM-learned positive direction | 1.8 | Cached semantic profile |
+| LLM-learned negative direction | 2.1 | Strong exclusion evidence |
+| Interested paper | 1.8 | Time-decayed |
+| Okay paper | 0.45 | Weak, time-decayed |
+| Not-interested paper | 1.8 negative | Time-decayed |
+| Local PDF opening text | 0.45–0.55 | Cold-start seed |
 
-Recent papers receive a small boost. Maximal Marginal Relevance-style selection balances relevance against within-batch similarity to reduce near-duplicate results.
+Behavioral feedback uses configurable exponential half-life with a floor, allowing recent preference changes to matter without erasing long-term history. Manual directions never decay.
 
-### 5. Explicit feedback loop
+### Hybrid retrieval
 
-Interested, Okay, and Not interested immediately affect the next recommendation batch. A paper is consumed only after an explicit rating; unrated papers may appear again.
+The first channel is word TF-IDF over title and abstract with unigram/bigram features. It rewards the top matching positive prototypes and subtracts strong negative matches.
 
-Feedback remains separate from behavior: opening PDFs, opening chat, sending questions, and switching chat history never change ratings automatically.
+The second channel is character n-gram TF-IDF, which is robust to hyphenation, inflection, abbreviations, and reordered technical phrases. Users can optionally configure an embedding model; embedding cosine similarity replaces the character channel when available and silently falls back locally on failure.
 
-## Semantic Interests and Topic Taxonomy
+Normalized channels are blended before semantic screening. A small publication-time term only breaks close relevance ties.
 
-### Interest profile
+### LLM semantic screening and calibration
 
-The LLM produces a concise profile and interpretable directions from:
+The reranker receives metadata for only the local retrieval pool plus:
 
-- truncated opening text from at most 12 local PDFs;
-- positive and negative recommendation feedback;
-- manually maintained preferred and avoided labels.
+- learned fine-grained positive and negative directions;
+- high-weight manual directions;
+- recent positive, neutral, and negative examples;
+- local-library topic cues.
 
-Artifacts such as `et al`, `omitted picture`, and isolated generic words are filtered. Interest directions are not capped at three.
+For each candidate it returns an interest probability, explicit reject flag, concrete reason, and matched canonical interest. Generic overlap such as “vision” or “learning” is insufficient.
 
-Refreshes run as coalesced background tasks when the application starts or when the library, feedback, model settings, or manual labels change. The analytics view reads SQLite cache only and does not wait for an LLM call.
+After at least eight rated recommendations, Paper Flow sweeps thresholds against real feedback and selects the best precision/recall/negative-utility trade-off. Until then it uses the configured default.
 
-### Fine-grained topics and semantic merging
+### Precision, balanced, and explore modes
 
-Each recommendation receives one to three specific topics such as `self-supervised vision foundation models` or `test-time adaptation for vision foundation models`, rather than broad labels such as `cs.CV`.
+- **Precision** raises the semantic floor and has almost no exploration budget.
+- **Balanced** uses the calibrated threshold with a modest adjacent-interest reserve.
+- **Explore** lowers the adjacent-interest floor, reserves more exploration positions, and tightens the per-topic cap.
 
-Paper Flow maintains an incremental canonical taxonomy:
+Final selection limits dominance by one matched interest, reserves mode-specific exploration positions, and applies MMR-style similarity penalties. This follows the mature “retrieval → ranking → post-ranking constraints” pattern used by large recommenders, adapted to a private cold-start stream rather than attempting to reproduce their scale.
 
-1. Existing frequent labels are supplied to the LLM so semantic equivalents reuse established terms.
-2. New labels are created only for genuinely different research problems.
-3. Local normalization merges casing, punctuation, hyphenation, singular/plural, and word-order variants.
-4. Topic generation shares the metadata-summary request and never requires full-paper content.
+## Fine-grained interest taxonomy
 
-## Four Model Roles
+The interest-profile model creates concepts such as `self-supervised vision foundation models` and `test-time adaptation for vision foundation models`, not `cs.CV`.
 
-All calls use the user-configured OpenAI Chat Completions-compatible endpoint. Each model must be supported by that base URL.
+Existing canonical labels are included in generation. New labels are locally normalized for punctuation, casing, singular/plural forms, token overlap, and edit similarity; semantic equivalents reuse the existing label. The result is cached and refreshed in a coalesced background job when PDFs, feedback, manual directions, or relevant model settings change. There is no three-label cap.
 
-| Setting | Responsibility | Boundary |
-| --- | --- | --- |
-| Semantic screening | Candidate interest probability and rejection | Independent from generation; may use a relevance-focused model |
-| Recommendation summary | Metadata TL;DR, reasons, fine-grained topics, and cached-copy translation | One shared structured recommendation-content pipeline |
-| Interest profile | Background synthesis of PDFs, feedback, and manual labels | Independently cached and refreshed |
-| Paper chat | Multi-turn, full-paper question answering | Largest context; can use a dedicated stronger model |
+## Diagnostics and offline evaluation
 
-Legacy single-model installations initially inherit that value for all four slots.
+Every recommendation run stores:
 
-## Chat with Paper
+- safe settings snapshot (never credentials or base URL);
+- retrieval, character/embedding, LLM, and final scores;
+- arXiv source offset, rejection flag/reason, matched interest, exploration flag;
+- final selection state and position;
+- candidate, selected, and LLM-call counts.
 
-Paper chat runs in a separate native window that can be moved, resized, minimized, and restored. Persistent conversations appear by recent activity in the left sidebar.
+Later feedback is joined to these decisions to calculate interest rate, dislike rate, empty-batch rate, average scanned candidates, and topic coverage. The analytics UI exposes recent decision paths, making algorithm changes measurable instead of subjective.
 
-- The full paper is downloaded and parsed only after the first question is sent.
-- The default question asks for a detailed explanation of the method.
-- A general system prompt follows questions about methods, experiments, equations, assumptions, comparisons, or limitations.
-- The latest 16 messages build multi-turn context.
-- Switching history reads local data and does not call the LLM.
-- Chat replaces the old fixed detailed-TL;DR action.
+## Long-PDF chat
 
-## History and Local Search
+Paper chat stores independent threads and uses a general research-assistant prompt. The default user prompt asks for a detailed method explanation, while any follow-up about equations, results, limitations, or specific details is allowed.
 
-History & Search stores every recommended paper and locally indexes titles, abstracts, metadata TL;DRs, legacy detailed TL;DRs, and fine-grained topics. It accepts both keywords and descriptive natural-language queries. Paper-chat history remains separate in the chat sidebar.
+PDF parsing is cached by SHA-256 fingerprint:
 
-Neither history is sent to an external search service.
+1. `auto` uses MinerU when an API URL is configured, otherwise PyMuPDF.
+2. `mineru` requires the external MinerU service and surfaces errors.
+3. `pymupdf` always uses the lightweight local parser.
 
-## Data, Caching, and Privacy
+Short papers preserve the complete structured Markdown. Long papers first produce a document map, then select coherent heading-level sections with adjacent context and method/result/limitation anchors. The selected sections receive stable evidence IDs such as `[S4]`; answers are instructed to cite them and the UI shows their headings. This avoids both naive full-text truncation and tiny-fragment RAG. See [MinerU and long-PDF chat](MINERU_EN.md).
 
-Desktop database:
+## LLM task boundaries
 
-```text
-%LOCALAPPDATA%\Paper Flow\state.db
-```
+| Model setting | Responsibility |
+| --- | --- |
+| Semantic screening | Candidate relevance, rejection, matched interest |
+| Recommendation summary | Metadata TL;DR, reasons, topic labels, translation |
+| Interest profile | Background fine-grained profile synthesis |
+| Paper chat | Structured full-paper multi-turn answers |
+| Embedding (optional) | Hybrid semantic retrieval |
 
-- API credentials, settings, feedback, recommendations, profiles, and chats remain in local SQLite.
-- Initial recommendation and semantic screening send arXiv metadata only.
-- Profiling may send truncated openings from at most 12 local PDFs to the configured LLM; the result is cached.
-- Full-paper content is processed and sent only after an explicit paper-chat question.
-- Language changes translate cached summaries and reasons without resending source papers.
-- Local PDF parsing is cached incrementally using file state.
-- Recommendation-history and PDF-cache clearing are independent and never delete source PDFs.
-- Uninstalling does not automatically delete the personal database.
+Legacy installations inherit the shared model until a specialized value is saved. Requests use configurable timeouts and retries. JSON generation receives one syntax-repair attempt before a safe fallback.
 
-On first desktop launch, `~/.arxiv-daily/state.db` is migrated only when the new destination database does not already exist.
+## Storage, security, and recovery
 
-## Resilience and Progress
+Schema version 3 includes settings, encrypted secrets, papers, batches, diagnostics, candidate cache, source state, local/parsed documents, activity, chats, and background jobs.
 
-- LLM JSON passes through cleanup, tolerant parsing, and structural validation.
-- Summary failures preserve and display the original abstract.
-- arXiv 429 responses use backoff; network retrieval pages are separate from the final recommendation batch.
-- The UI reports real arXiv request, local filtering, LLM screening, generation, download, extraction, and saving stages.
-- Generated summaries, reasons, translations, topics, and profiles are cached to avoid repeated token use.
+- API keys are never stored in the settings table. Windows uses user-bound DPAPI; other systems use Fernet with a per-installation key file.
+- A one-time migration encrypts and vacuums legacy plaintext keys.
+- SQLite uses WAL, a busy timeout, serialized writes, startup interruption recovery, integrity-checked backups, and validated restore.
+- Recommendation diagnostics remove credentials and the private base URL.
+- Full-paper content is sent only after an explicit chat question; recommendations use arXiv metadata.
+- Language changes translate cached generated copy without resending source papers.
 
-## Design References
+Long operations report concrete stages and can be cancelled between network/model steps.
 
-- [Google Recommendation Systems Overview](https://developers.google.com/machine-learning/recommendation/overview/types)
-- [Deep Neural Networks for YouTube Recommendations](https://research.google.com/pubs/archive/45530.pdf)
-- [The Use of MMR, Diversity-Based Reranking for Reordering Documents and Producing Summaries](https://aclanthology.org/X98-1025.pdf)
-- [Context-Aware Hierarchical Taxonomy Generation for Scientific Papers via LLM-Guided Multi-Aspect Clustering](https://aclanthology.org/2025.emnlp-main.788/)
+## Design references
 
-Paper Flow is an engineering adaptation for a single-user paper stream; it does not claim to reproduce the scale or complete models of commercial recommenders.
+- [Google: Recommendation systems overview](https://developers.google.com/machine-learning/recommendation/overview/types)
+- [Covington et al.: Deep Neural Networks for YouTube Recommendations](https://research.google.com/pubs/archive/45530.pdf)
+- [Carbonell and Goldstein: MMR diversity reranking](https://aclanthology.org/X98-1025.pdf)
+- [MinerU](https://github.com/opendatalab/MinerU)
+
+Paper Flow is an engineering adaptation for a local research workflow and does not claim to reproduce any commercial system's complete models or scale.

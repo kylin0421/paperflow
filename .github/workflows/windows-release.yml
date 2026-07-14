@@ -20,19 +20,29 @@ jobs:
         run: choco install innosetup -y --no-progress
 
       - name: Test
-        run: uv run pytest
+        run: |
+          uv run ruff check src tests
+          uv run pytest
 
       - name: Build Windows installer
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1
 
-      - name: Create portable archive
-        shell: powershell
-        run: Compress-Archive -Path dist/PaperFlow/* -DestinationPath dist/PaperFlow-portable.zip
-
       - uses: actions/upload-artifact@v4
         with:
-          name: paperflow-windows-v0.0.0
+          name: paperflow-windows-${{ github.ref_name }}
           path: |
             dist/installer/PaperFlow-Setup.exe
             dist/PaperFlow-portable.zip
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${{ github.ref_name }}"
+          dist/installer/PaperFlow-Setup.exe
+          dist/PaperFlow-portable.zip
+          --title "Paper Flow ${{ github.ref_name }}"
+          --generate-notes

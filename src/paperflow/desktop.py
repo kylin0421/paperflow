@@ -115,6 +115,7 @@ def main(argv: list[str] | None = None) -> None:
     migrate_legacy_data(data_dir)
     AppHandler.app = Recommender(Store(data_dir / "state.db"))
     AppHandler.app.schedule_interest_refresh()
+    AppHandler.app.schedule_candidate_refresh()
     server = ThreadingHTTPServer(("127.0.0.1", 0), AppHandler)
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
@@ -147,6 +148,7 @@ def main(argv: list[str] | None = None) -> None:
     finally:
         server.shutdown()
         server.server_close()
+        AppHandler.app.store.close()
         if mutex not in (None, False) and os.name == "nt":
             ctypes.windll.kernel32.CloseHandle(mutex)
 

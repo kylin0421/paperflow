@@ -1,5 +1,5 @@
 #define MyAppName "Paper Flow"
-#define MyAppVersion "0.0.0"
+#define MyAppVersion "0.1.0"
 #define MyAppPublisher "Paper Flow Contributors"
 #define MyAppExeName "PaperFlow.exe"
 

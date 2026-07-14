@@ -14,14 +14,15 @@
 ```powershell
 git clone https://github.com/kylin0421/paperflow.git
 cd paperflow
-uv sync --group dev
-uv run paperflow-desktop
+uv sync
+uv run paperflow --host 127.0.0.1 --port 8765
 ```
 
 浏览器调试模式：
 
 ```powershell
-uv run paperflow --host 127.0.0.1 --port 8765
+uv sync --extra desktop --group dev
+uv run paperflow-desktop
 ```
 
 默认桌面数据目录：

@@ -4,19 +4,25 @@ build-backend = "uv_build"
 
 [project]
 name = "paperflow"
-version = "0.0.0"
-description = "A private, local-first arXiv paper recommendation desktop app."
+version = "0.1.0"
+description = "A private, local-first arXiv paper recommendation application."
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "AGPL-3.0-or-later" }
 keywords = ["arxiv", "papers", "recommendation", "research", "desktop"]
 dependencies = [
     "arxiv>=2.4.0",
+    "cryptography>=45.0.0",
+    "httpx>=0.28.1",
     "numpy>=2.3.0",
     "openai>=2.24.0",
     "scikit-learn>=1.7.1",
     "pymupdf4llm>=0.3.4",
-    "pymupdf-layout>=1.27.1",
+]
+
+[project.optional-dependencies]
+desktop = [
+    "pymupdf-layout>=1.27.1; sys_platform == 'win32'",
     "pywebview>=6.1; sys_platform == 'win32'",
 ]
 

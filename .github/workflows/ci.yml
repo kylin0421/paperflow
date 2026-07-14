@@ -19,5 +19,11 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v7.1.4
 
+      - name: Lint
+        run: uv run ruff check src tests
+
+      - name: Compile
+        run: uv run python -m compileall -q src tests
+
       - name: Run tests
         run: uv run pytest --cov=src/paperflow --cov-report=term-missing

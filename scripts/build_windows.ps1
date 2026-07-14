@@ -4,7 +4,7 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
 & (Join-Path $PSScriptRoot "generate_icon.ps1")
-uv sync --group dev
+uv sync --extra desktop --group dev
 uv run pyinstaller --noconfirm --clean PaperFlow.spec
 
 $exe = Join-Path $root "dist\PaperFlow\PaperFlow.exe"
