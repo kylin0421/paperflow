@@ -1,0 +1,38 @@
+name: Windows release build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Build Windows installer
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1
+
+      - name: Create portable archive
+        shell: powershell
+        run: Compress-Archive -Path dist/PaperFlow/* -DestinationPath dist/PaperFlow-portable.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paperflow-windows-v0.0.0
+          path: |
+            dist/installer/PaperFlow-Setup.exe
+            dist/PaperFlow-portable.zip

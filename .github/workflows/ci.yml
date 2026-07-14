@@ -19,6 +19,5 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v7.1.4
 
-      - name: Run Pytest
-        run: |
-          uv run pytest -m "" --cov=src/zotero_arxiv_daily --cov-report=term-missing
+      - name: Run tests
+        run: uv run pytest --cov=src/paperflow --cov-report=term-missing
