@@ -27,6 +27,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from paperflow.security import SecretProtector
+from paperflow.mineru_runtime import ManagedMinerURuntime
 
 
 DEFAULTS = {
@@ -45,8 +46,11 @@ DEFAULTS = {
     "candidate_cache_ttl_minutes": 120,
     "background_refresh_minutes": 60,
     "pdf_parser": "auto",
+    "mineru_runtime_mode": "managed",
     "mineru_api_url": "",
     "mineru_backend": "pipeline",
+    "mineru_model_source": "auto",
+    "mineru_worker_startup_seconds": 90,
     "mineru_timeout_seconds": 900,
     "chat_context_chars": 70000,
     "llm_timeout_seconds": 120,
@@ -313,6 +317,13 @@ class Store:
         for key in SPECIALIZED_MODEL_KEYS:
             if key not in stored_keys:
                 result[key] = result["model"]
+        # Preserve v0.1.0 installations that explicitly configured an external
+        # MinerU service before the deployment-mode setting existed.
+        if (
+            "mineru_runtime_mode" not in stored_keys
+            and str(result.get("mineru_api_url", "")).strip()
+        ):
+            result["mineru_runtime_mode"] = "remote"
         return result
 
     def save_settings(self, values: dict[str, Any]) -> dict[str, Any]:
@@ -1016,6 +1027,9 @@ class Recommender:
         self._profile_pending = False
         self._candidate_refresh_lock = threading.Lock()
         self._cancel_event = threading.Event()
+        self.mineru_runtime = ManagedMinerURuntime(
+            self.store.path.parent / "runtimes" / "mineru"
+        )
 
     def progress(self) -> dict[str, Any]:
         with self._progress_lock:
@@ -1128,7 +1142,15 @@ class Recommender:
 
     def cancel_progress(self) -> dict[str, Any]:
         self._cancel_event.set()
+        if self.progress().get("stage") in {
+            "chat_mineru_starting", "chat_mineru_health", "chat_mineru_parsing",
+        }:
+            self.mineru_runtime.stop()
         return {"cancelled": True, "run_id": self.progress()["run_id"]}
+
+    def close(self) -> None:
+        self.mineru_runtime.close()
+        self.store.close()
 
     def _check_cancelled(self) -> None:
         if self._cancel_event.is_set():
@@ -2170,9 +2192,31 @@ Return a JSON object keyed by paper id: {{"tldr":"TL;DR","topics":["fine-grained
                 return text
             parser = str(settings.get("pdf_parser", "auto"))
             mineru_url = str(settings.get("mineru_api_url", "")).strip()
+            runtime_mode = str(settings.get("mineru_runtime_mode", "managed"))
             document = None
-            if parser == "mineru" or (parser == "auto" and mineru_url):
+            use_managed = runtime_mode == "managed" and self.mineru_runtime.status()["installed"]
+            use_remote = runtime_mode == "remote" and bool(mineru_url)
+            if parser == "mineru" or (parser == "auto" and (use_managed or use_remote)):
                 try:
+                    if runtime_mode == "managed":
+                        if not use_managed:
+                            raise RuntimeError(
+                                "Local MinerU is not installed; install it in Settings first"
+                                if settings["language"] == "English" else
+                                "本机 MinerU 尚未安装，请先在设置中完成安装"
+                            )
+                        self._set_progress("chat_mineru_starting", 24)
+                        mineru_url = self.mineru_runtime.ensure_running(
+                            model_source=str(settings.get("mineru_model_source", "auto")),
+                            timeout=float(settings.get("mineru_worker_startup_seconds", 90)),
+                            cancel_event=self._cancel_event,
+                        )
+                    elif not mineru_url:
+                        raise RuntimeError(
+                            "Configure a remote MinerU API URL first"
+                            if settings["language"] == "English" else
+                            "请先配置远程 MinerU API URL"
+                        )
                     self._set_progress("chat_mineru_health", 27)
                     mineru = MinerUClient(
                         mineru_url,
@@ -2198,12 +2242,44 @@ Return a JSON object keyed by paper id: {{"tldr":"TL;DR","topics":["fine-grained
 
     def test_mineru(self) -> dict[str, Any]:
         settings = self.store.settings()
-        url = str(settings.get("mineru_api_url", "")).strip()
-        if not url:
-            raise ValueError("Configure a MinerU API URL first")
         from paperflow.documents import MinerUClient
 
-        return {"ok": True, "health": MinerUClient(url).health()}
+        if str(settings.get("mineru_runtime_mode", "managed")) == "managed":
+            return self.test_managed_mineru()
+        url = str(settings.get("mineru_api_url", "")).strip()
+        if not url:
+            raise ValueError("Configure a remote MinerU API URL first")
+        return {"ok": True, "mode": "remote", "health": MinerUClient(url).health()}
+
+    def test_managed_mineru(self) -> dict[str, Any]:
+        settings = self.store.settings()
+        from paperflow.documents import MinerUClient
+
+        url = self.mineru_runtime.ensure_running(
+            model_source=str(settings.get("mineru_model_source", "auto")),
+            timeout=float(settings.get("mineru_worker_startup_seconds", 90)),
+        )
+        return {
+            "ok": True,
+            "mode": "managed",
+            "health": MinerUClient(url).health(),
+            "runtime": self.mineru_runtime.status(),
+        }
+
+    def mineru_status(self) -> dict[str, Any]:
+        return self.mineru_runtime.status()
+
+    def install_mineru(self, repair: bool = False) -> dict[str, Any]:
+        return self.mineru_runtime.install_async(repair=repair)
+
+    def cancel_mineru_install(self) -> dict[str, Any]:
+        return self.mineru_runtime.cancel_install()
+
+    def stop_mineru(self) -> dict[str, Any]:
+        return self.mineru_runtime.stop()
+
+    def uninstall_mineru(self) -> dict[str, Any]:
+        return self.mineru_runtime.uninstall()
 
     def test_llm(self) -> dict[str, Any]:
         settings = self.store.settings()
@@ -2331,11 +2407,14 @@ class AppHandler(BaseHTTPRequestHandler):
                     "jobs": self.app.store.jobs(),
                     "arxiv_cache": self.app.store.arxiv_cache_status(self.app.store.settings()),
                 })
+            if path == "/api/integrations/mineru/status":
+                return self._json(self.app.mineru_status())
             if path == "/api/system":
                 return self._json({
                     "schema_version": SCHEMA_VERSION,
                     "database": str(self.app.store.path),
                     "jobs": self.app.store.jobs(),
+                    "mineru": self.app.mineru_status(),
                 })
             if path == "/api/analytics":
                 return self._json(self.app.analytics())
@@ -2393,6 +2472,16 @@ class AppHandler(BaseHTTPRequestHandler):
                 return self._json(self.app.cancel_progress())
             if self.path == "/api/integrations/mineru/test":
                 return self._json(self.app.test_mineru())
+            if self.path == "/api/integrations/mineru/managed/test":
+                return self._json(self.app.test_managed_mineru())
+            if self.path == "/api/integrations/mineru/install":
+                return self._json(self.app.install_mineru(bool(data.get("repair", False))))
+            if self.path == "/api/integrations/mineru/install/cancel":
+                return self._json(self.app.cancel_mineru_install())
+            if self.path == "/api/integrations/mineru/stop":
+                return self._json(self.app.stop_mineru())
+            if self.path == "/api/integrations/mineru/uninstall":
+                return self._json(self.app.uninstall_mineru())
             if self.path == "/api/integrations/llm/test":
                 return self._json(self.app.test_llm())
             if self.path == "/api/database/backup":
@@ -2462,7 +2551,7 @@ def main(argv: list[str] | None = None):
         server.serve_forever()
     finally:
         server.server_close()
-        AppHandler.app.store.close()
+        AppHandler.app.close()
 
 
 if __name__ == "__main__":

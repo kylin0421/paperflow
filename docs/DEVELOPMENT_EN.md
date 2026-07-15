@@ -82,7 +82,7 @@ Before a release, keep workflow versions aligned with Python, uv, PyInstaller, a
 - [x] Legacy Zotero, email, bioRxiv/medRxiv, and training dependencies removed.
 - [x] PyMuPDF layout/ONNX resources included in the directory build.
 - [x] Schema v3 migration, encrypted secrets, and backup/restore.
-- [x] Optional external MinerU integration with lightweight fallback.
+- [x] Optional managed-local MinerU runtime, remote mode, and lightweight fallback.
 - [x] Automated tests and versioned GitHub release packaging.
 - [ ] Authenticode code signing.
 - [ ] Manual acceptance tests on clean Windows 10 and Windows 11 virtual machines.

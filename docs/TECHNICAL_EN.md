@@ -102,9 +102,11 @@ Paper chat stores independent threads and uses a general research-assistant prom
 
 PDF parsing is cached by SHA-256 fingerprint:
 
-1. `auto` uses MinerU when an API URL is configured, otherwise PyMuPDF.
-2. `mineru` requires the external MinerU service and surfaces errors.
+1. `auto` uses the managed MinerU Worker when installed, or a configured remote service, with PyMuPDF fallback.
+2. `mineru` requires the selected local/remote MinerU deployment and surfaces errors.
 3. `pymupdf` always uses the lightweight local parser.
+
+The managed runtime is isolated from the Python 3.13 application. Bundled `uv` creates an application-owned Python 3.12 environment and installs the pinned CPU pipeline on demand. A loopback-only Worker is started lazily, reused across papers, restarted after failure, and stopped on cancellation or application exit. This keeps the base localhost deployment light while removing manual API setup for Windows users.
 
 Short papers preserve the complete structured Markdown. Long papers first produce a document map, then select coherent heading-level sections with adjacent context and method/result/limitation anchors. The selected sections receive stable evidence IDs such as `[S4]`; answers are instructed to cite them and the UI shows their headings. This avoids both naive full-text truncation and tiny-fragment RAG. See [MinerU and long-PDF chat](MINERU_EN.md).
 

@@ -16,6 +16,7 @@ def paper(identifier="1", title="Graph learning", abstract="graph neural network
 def test_store_settings_feedback_and_seen(tmp_path):
     store = Store(tmp_path / "state.db")
     assert store.settings()["batch_size"] == 12
+    assert store.settings()["mineru_runtime_mode"] == "managed"
     store.save_settings({"batch_size": 3, "unknown": True})
     store.record([paper()])
     assert store.seen() == set()
@@ -127,6 +128,16 @@ def test_specialized_models_inherit_legacy_model_until_individually_saved(tmp_pa
     assert configured["summary_model"] == "summary-model"
     assert configured["interest_model"] == "legacy-model"
     assert configured["chat_model"] == "chat-model"
+
+
+def test_legacy_mineru_url_keeps_remote_deployment_mode(tmp_path):
+    store = Store(tmp_path / "state.db")
+    store.save_settings({"mineru_api_url": "http://127.0.0.1:8000"})
+
+    assert store.settings()["mineru_runtime_mode"] == "remote"
+
+    store.save_settings({"mineru_runtime_mode": "managed"})
+    assert store.settings()["mineru_runtime_mode"] == "managed"
 
 
 def test_local_pdf_text_is_cached_until_file_changes(tmp_path):
@@ -698,6 +709,9 @@ def test_new_ui_features_and_readme_have_english_support():
     assert 'name="summary_model"' in html
     assert 'name="interest_model"' in html
     assert 'name="chat_model"' in html
+    assert 'name="mineru_runtime_mode"' in html
+    assert "/api/integrations/mineru/install" in html
+    assert "Install local MinerU" in html
     assert "Chat history" in chat
     assert "/api/chats" in chat
     assert "TL;DR generation failed:" in (root / "src/paperflow/webapp.py").read_text(encoding="utf-8")

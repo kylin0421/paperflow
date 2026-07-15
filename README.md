@@ -6,7 +6,7 @@
 
 Paper Flow is a private, local-first arXiv recommender that learns from your PDF library, explicit ratings, and freely editable interests. It combines hybrid local retrieval with LLM semantic screening, then provides evidence-aware chat over full papers.
 
-Current release: **v0.1.0**
+Current release: **v0.1.1**
 
 ## Lightweight localhost setup
 
@@ -34,9 +34,9 @@ uv sync --extra desktop
 uv run paperflow-desktop
 ```
 
-The unsigned v0.1.0 build may trigger a Windows SmartScreen warning. The per-user installer does not require administrator privileges and keeps application data after uninstall.
+The unsigned v0.1.1 build may trigger a Windows SmartScreen warning. The per-user installer does not require administrator privileges and keeps application data after uninstall.
 
-## What v0.1.0 includes
+## What v0.1.1 includes
 
 - Fine-grained LLM-generated interests instead of broad arXiv categories, with semantic label merging and unlimited editable preferred/avoided directions.
 - Hybrid word/character retrieval, optional embeddings, time-decayed feedback, calibrated LLM screening, multi-interest quotas, MMR diversity, and precision/balanced/explore modes.
@@ -44,14 +44,14 @@ The unsigned v0.1.0 build may trigger a Windows SmartScreen warning. The per-use
 - Auditable recommendation runs with scores, rejection reasons, decision paths, and feedback-based quality metrics.
 - Natural-language history search, bilingual UI, dark mode, detailed progress, and cancellable long operations.
 - Separate paper-chat window with history, Markdown rendering, task-specific models, and evidence-labelled long-document context.
-- Optional MinerU 3.x structured PDF parsing through an external `mineru-api`, with automatic local PyMuPDF fallback.
+- One-click managed local MinerU 3.x with an isolated Python 3.12 environment, automatic Worker lifecycle, an optional remote-service mode, and PyMuPDF fallback.
 - Versioned SQLite schema, encrypted API keys, connection tests, and built-in backup/restore.
 
 Ratings only change preference. Opening the original PDF or chatting with a paper are separate behaviors and never rate a paper automatically.
 
-## Optional MinerU integration
+## Optional managed MinerU
 
-Run [MinerU](https://github.com/opendatalab/MinerU) as a separate service, then set its URL (for example `http://127.0.0.1:8000`) in Advanced Settings. Paper Flow uses MinerU's structured Markdown for long-paper section selection and evidence IDs; the default localhost installation remains lightweight and uses PyMuPDF when MinerU is unavailable.
+Select **Install local MinerU** in Advanced Settings. Paper Flow creates an isolated Python 3.12 environment, starts and reuses a loopback-only Worker on demand, and stops it on exit. No API URL or manual service setup is required. MinerU and its models remain optional downloads; without them, Paper Flow uses PyMuPDF. Advanced users can still select a remote MinerU service.
 
 See [MinerU and long-PDF chat](docs/MINERU_EN.md) for setup choices and design details.
 

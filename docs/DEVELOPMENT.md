@@ -82,6 +82,8 @@ dist\installer\PaperFlow-Setup.exe
 - [x] 中英文界面、README 与深色模式。
 - [x] 旧 Zotero、邮件、bioRxiv/medRxiv 和训练依赖已移除。
 - [x] PyMuPDF layout/ONNX 资源包含在目录版构建中。
+- [x] 可选本机托管 MinerU、远程模式与轻量回退。
+- [x] Schema v3 迁移、密钥加密与备份恢复。
 - [x] 自动化测试和安装包构建脚本。
 - [ ] Authenticode 代码签名。
 - [ ] 在干净的 Windows 10 和 Windows 11 虚拟机中分别完成人工验收。

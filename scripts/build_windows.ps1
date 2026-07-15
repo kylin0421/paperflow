@@ -4,12 +4,19 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
 & (Join-Path $PSScriptRoot "generate_icon.ps1")
+if (-not $?) { throw "Icon generation failed" }
 uv sync --extra desktop --group dev
+if ($LASTEXITCODE -ne 0) { throw "Dependency sync failed with exit code $LASTEXITCODE" }
 uv run pyinstaller --noconfirm --clean PaperFlow.spec
+if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCODE" }
 
 $exe = Join-Path $root "dist\PaperFlow\PaperFlow.exe"
 if (-not (Test-Path -LiteralPath $exe)) {
     throw "Build completed without producing dist\PaperFlow\PaperFlow.exe"
+}
+$uvRuntime = Join-Path $root "dist\PaperFlow\_internal\uv.exe"
+if (-not (Test-Path -LiteralPath $uvRuntime)) {
+    throw "Build completed without the managed-runtime installer (uv.exe)"
 }
 
 Write-Host "Paper Flow desktop build created at: $exe"
@@ -36,6 +43,7 @@ if (-not $iscc) {
 if ($iscc) {
     $compiler = if ($iscc.Source) { $iscc.Source } else { $iscc.FullName }
     & $compiler (Join-Path $root "installer\PaperFlow.iss")
+    if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
     Write-Host "Paper Flow installer created under dist\installer"
 } else {
     Write-Host "Inno Setup was not found; the portable desktop build is ready."

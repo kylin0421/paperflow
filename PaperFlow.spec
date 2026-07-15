@@ -1,15 +1,17 @@
 from pathlib import Path
+import shutil
 
 from PyInstaller.utils.hooks import collect_data_files
 
 
 root = Path(SPEC).parent
 package = root / "src" / "paperflow"
+uv = shutil.which("uv")
 
 a = Analysis(
     [str(package / "desktop.py")],
     pathex=[str(root / "src")],
-    binaries=[],
+    binaries=[(uv, ".")] if uv else [],
     datas=[(str(package / "static"), "paperflow/static")]
           + collect_data_files("pymupdf4llm")
           # pymupdf-layout loads its YAML and ONNX models by filesystem path at

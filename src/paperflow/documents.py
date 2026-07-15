@@ -126,7 +126,7 @@ def structured_context(markdown: str, question: str, max_chars: int = 70000
 
 
 class MinerUClient:
-    """Small client for MinerU 3.x's optional external ``mineru-api`` service."""
+    """Client shared by the managed-local and optional remote MinerU services."""
 
     def __init__(self, base_url: str, timeout: float = 900):
         self.base_url = str(base_url).rstrip("/")

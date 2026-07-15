@@ -148,7 +148,7 @@ def main(argv: list[str] | None = None) -> None:
     finally:
         server.shutdown()
         server.server_close()
-        AppHandler.app.store.close()
+        AppHandler.app.close()
         if mutex not in (None, False) and os.name == "nt":
             ctypes.windll.kernel32.CloseHandle(mutex)
 

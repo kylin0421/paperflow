@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.1 - 2026-07-15
+
+### Added
+
+- One-click managed local MinerU installation in an isolated Python 3.12 environment.
+- Automatic localhost Worker startup, health checks, single-process reuse, crash recovery, cancellation, and clean shutdown.
+- MinerU runtime status, install/repair, stop, and uninstall controls in the bilingual Settings UI.
+- Bundled `uv` runtime installer in Windows desktop packages; MinerU remains an optional on-demand download.
+
+### Changed
+
+- Managed local MinerU is now the default deployment mode; remote `mineru-api` remains available as an advanced option.
+- The lightweight localhost and Windows application stay usable with PyMuPDF when MinerU is not installed.
+
 ## 0.1.0 - 2026-07-14
 
 First stable Paper Flow release.
