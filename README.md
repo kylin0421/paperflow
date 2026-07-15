@@ -8,6 +8,20 @@ Paper Flow is a private, local-first arXiv recommender that learns from your PDF
 
 Current release: **v0.1.1**
 
+## App screenshots
+
+### Personalized recommendation feed
+
+Fine-grained reasons, match scores, explicit preference controls, and separate PDF/chat actions are visible on every paper card.
+
+![Paper Flow personalized recommendation feed](docs/images/recommendation-feed.png)
+
+<p align="center">
+  <a href="docs/images/interest-profile.png"><img src="docs/images/interest-profile.png" width="49%" alt="LLM-generated and user-editable interest profile"></a>
+  <a href="docs/images/paper-chat.png"><img src="docs/images/paper-chat.png" width="49%" alt="Evidence-aware chat with a paper and conversation history"></a>
+</p>
+<p align="center"><sub>LLM-generated interest profile with high-weight manual controls · Evidence-aware paper chat with Markdown, sources, and history</sub></p>
+
 ## Lightweight localhost setup
 
 This is the smallest cross-platform option. It does not require the Windows desktop shell, WebView2, or MinerU.
